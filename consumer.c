@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <stdbool.h>
+#include <errno.h>
 
 
 #define MMAP_SIZE 4096
@@ -22,10 +23,13 @@ typedef struct
 
 item buffer[BUFFER_SIZE];
 int ITEM_NO = 0;
+const char* name;
 
-
-
-
+void handle_sigint(int sig)
+{
+    shm_unlink(name);
+    exit(0);
+}
 
 unsigned int ip_checksum(unsigned char *data, int nbytes)
 {
@@ -120,11 +124,15 @@ void consume(item* ptr)
 
 int main(int argc, char const **argv)
 {
-    const char* name = argv[1];
-    int shm_fd = shm_open(name, O_RDONLY);
+    name = argv[1];
+
+    signal(SIGINT, handle_sigint);
+
+    printf("name:%s\n", name);
+    int shm_fd = shm_open(name, O_RDONLY, 0666);
     if (shm_fd==-1)
     {
-        printf("error opening shared memory\n");
+        printf("error opening shared memory\nname:%s errno:%d\n", name, errno);
         exit(1);
     }
     ftruncate(shm_fd, MMAP_SIZE);
@@ -132,8 +140,7 @@ int main(int argc, char const **argv)
     item* ptr = (item*)(mmap(0, MMAP_SIZE, PROT_READ, MAP_SHARED, shm_fd, 0));
 
 
-    consume(ptr);
 
-    shm_unlink(name);
+    consume(ptr);
     return 0;
 }

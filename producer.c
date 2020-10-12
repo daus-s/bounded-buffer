@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <stdbool.h>
+#include <errno.h>
 
 
 #define MMAP_SIZE 4096
@@ -21,7 +22,13 @@ typedef struct
 
 item buffer[BUFFER_SIZE];
 int ITEM_NO = 0;
+const char* name;
 
+void handle_sigint(int sig)
+{
+    shm_unlink(name);
+    exit(0);
+}
 
 unsigned int ip_checksum(unsigned char *data, int nbytes)
 {
@@ -69,6 +76,7 @@ void func_produce(item* item_ptr)
     {
         item_ptr->payload[i]=(unsigned char) rand() % 256;
     }
+    printf("%s\n", item_ptr->payload);
     item_ptr->cksum = ip_checksum(item_ptr->payload, PAYLOAD_SIZE);
     item_ptr->item_no = ITEM_NO++;
 }
@@ -107,11 +115,16 @@ void produce(item* ptr)
 
 int main(int argc, char const **argv)
 {
-    const char* name = argv[1];
-    int shm_fd = shm_open(name, O_CREAT | O_RDWR);
+    name = argv[1];
+
+    signal(SIGINT, handle_sigint);
+
+
+    printf("name:%s\n", name);
+    int shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
     if (shm_fd==-1)
     {
-        printf("error opening shared memory\n");
+        printf("error opening shared memory\nname:%s errno:%d\n", name, errno);
         exit(1);
     }
     ftruncate(shm_fd, MMAP_SIZE);
@@ -120,6 +133,5 @@ int main(int argc, char const **argv)
 
 
     produce(ptr);
-    shm_unlink(name);
     return 0;
 }
