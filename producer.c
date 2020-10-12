@@ -74,7 +74,7 @@ void func_produce(item* item_ptr)
     {
         item_ptr->payload[i]=(unsigned char) rand() % 256;
     }
-    printf("%s\n", item_ptr->payload);
+    //printf("%s\n", item_ptr->payload);
     item_ptr->cksum = ip_checksum(item_ptr->payload, PAYLOAD_SIZE);
     item_ptr->item_no = ITEM_NO++;
 }
