@@ -69,8 +69,6 @@ unsigned int ip_checksum(unsigned char *data, int nbytes)
 /*    next_produced.payload[n] = (unsigned char) rand() % 256 */
 void func_produce(item* item_ptr)
 {
-    time_t t;
-    srand((unsigned) time(&t));
 
     for (size_t i = 0; i < PAYLOAD_SIZE; ++i)
     {
