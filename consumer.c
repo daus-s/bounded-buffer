@@ -4,13 +4,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
+#include <stdbool.h>
+
 
 #define MMAP_SIZE 4096
 #define BUFFER_SIZE 100
 #define PAYLOAD_SIZE 34
-
-item buffer[BUFFER_SIZE];
-int ITEM_NO = 0;
 
 
 typedef struct
@@ -19,6 +19,12 @@ typedef struct
      unsigned short cksum;                  /* 16-bit Internet checksum*/
      unsigned char payload[PAYLOAD_SIZE];   /* random generated data */
 } item;
+
+item buffer[BUFFER_SIZE];
+int ITEM_NO = 0;
+
+
+
 
 
 unsigned int ip_checksum(unsigned char *data, int nbytes)
@@ -58,15 +64,32 @@ unsigned int ip_checksum(unsigned char *data, int nbytes)
 /* 1. Check for no skipped buffers (item_no is contiguous) */
 /* 2. Verify the calculated checksum matches what is stored in
 next_consumed */
-void next_consumed(item* ptr)
+bool func_consume(item* ptr)
 {
-    ptr->
+    if (ptr->item_no==ITEM_NO)
+    {
+        ITEM_NO++;
+        if (ip_checksum(ptr->payload, PAYLOAD_SIZE)==ptr->cksum)
+        {
+            return true;
+        }
+        else
+        {
+            printf("ip_checksums do not match\nptr->cksum:%d ip_checksum(...):%d\n",ptr->cksum,ip_checksum(ptr->payload, PAYLOAD_SIZE));
+        }
+    }
+    else
+    {
+        printf("non continguous\nptr->item_no:%d ITEM_NO:%d\n", ptr->item_no, ITEM_NO);
+    }
+    return false;
 }
 
-void consume()
+void consume(item* ptr)
 {
     int in = 0;
     int out = 0;
+    bool f1 = true; //finished 1 time
 
     item next_consumed;
 
@@ -74,27 +97,43 @@ void consume()
     {
         while (in == out)
         {
+            if (f1)
+            {
+                printf("done!\n");
+                f1 = false;
+            }
             sleep(1); /* do nothing but sleep for 1 second */
         }
+        memcpy(&buffer[out], &(ptr[out]), PAYLOAD_SIZE);
         next_consumed = buffer[out];
-        out = (out + 1) % BUFFER SIZE;
 
+        if (!func_consume(&next_consumed))
+        {
+            break;
+        }
 
-      }
+        out = (out + 1) % BUFFER_SIZE;
+    }
 
 }
 
 
 int main(int argc, char const **argv)
 {
-    char* name = argv[1];
+    const char* name = argv[1];
     int shm_fd = shm_open(name, O_RDONLY);
-    ftruncate(smh_fd, MMAP_SIZE);
+    if (shm_fd==-1)
+    {
+        printf("error opening shared memory\n");
+        exit(1);
+    }
+    ftruncate(shm_fd, MMAP_SIZE);
 
-    buffer = (item*)(mmap(0, MMAP_SIZE, PROT_READ, MAP_SHARED, shm_fd, 0));
-    buffer[0]->item_no = 0;
+    item* ptr = (item*)(mmap(0, MMAP_SIZE, PROT_READ, MAP_SHARED, shm_fd, 0));
 
-    consume();
 
+    consume(ptr);
+
+    shm_unlink(name);
     return 0;
 }

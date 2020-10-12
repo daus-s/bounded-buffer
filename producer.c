@@ -4,14 +4,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
+#include <stdbool.h>
 
 
 #define MMAP_SIZE 4096
 #define BUFFER_SIZE 100
 #define PAYLOAD_SIZE 34
-
-item buffer[BUFFER_SIZE];
-int ITEM_NO = 0;
 
 typedef struct
 {
@@ -19,6 +18,9 @@ typedef struct
      unsigned short cksum;                  /* 16-bit Internet checksum*/
      unsigned char payload[PAYLOAD_SIZE];   /* random generated data */
 } item;
+
+item buffer[BUFFER_SIZE];
+int ITEM_NO = 0;
 
 
 unsigned int ip_checksum(unsigned char *data, int nbytes)
@@ -58,7 +60,7 @@ unsigned int ip_checksum(unsigned char *data, int nbytes)
 /* 2. Calculate the 16-bit checksum (cksum) */
 /* 3. Generate the payload data             */
 /*    next_produced.payload[n] = (unsigned char) rand() % 256 */
-void next_produced(item* item_ptr)
+void func_produce(item* item_ptr)
 {
     time_t t;
     srand((unsigned) time(&t));
@@ -73,25 +75,31 @@ void next_produced(item* item_ptr)
 
 
 
-void produce()
+void produce(item* ptr)
 {
     int in = 0;
     int out = 0;
-
+    bool f1 = true; //finished 1 time
 
     item next_produced;
 
     while (true)
     {
 
-        next_produced(&next_produced);
+        func_produce(&next_produced);
 
 
         while (((in + 1) % BUFFER_SIZE) == out)
         {
+            if (f1)
+            {
+                printf("done!\n");
+                f1 = false;
+            }
             sleep(1); /* do nothing but sleep for 1 second */
         }
         buffer[in] = next_produced; /* store next_produced into shared buffer */
+        memcpy(&(ptr[in]), &buffer[in], PAYLOAD_SIZE);
         in = (in + 1) % BUFFER_SIZE;
     }
 }
@@ -99,13 +107,19 @@ void produce()
 
 int main(int argc, char const **argv)
 {
-    char* name = argv[1];
-    int shm_fd = shm_open(name, O_RDWR);
-    ftruncate(smh_fd, MMAP_SIZE);
+    const char* name = argv[1];
+    int shm_fd = shm_open(name, O_CREAT | O_RDWR);
+    if (shm_fd==-1)
+    {
+        printf("error opening shared memory\n");
+        exit(1);
+    }
+    ftruncate(shm_fd, MMAP_SIZE);
 
-    buffer = (item*)(mmap(0, MMAP_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0));
+    item* ptr = (item*)(mmap(0, MMAP_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0));
 
-    produce();
 
+    produce(ptr);
+    shm_unlink(name);
     return 0;
 }
